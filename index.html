@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>סידור שולחנות | חתונה חמרי</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --purple:       #6a0dad;
+    --purple-light: #9b59b6;
+    --purple-dark:  #4a0080;
+    --gold:         #c9963a;
+    --gold-light:   #e8c06a;
+    --gold-dark:    #8a6020;
+    --deep:         #0d0014;
+    --cream:        #fdf6ff;
+    --success:      #27ae60;
+    --danger:       #e74c3c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Serif Hebrew', serif;
+    background: var(--deep);
+    color: var(--cream);
+    min-height: 100vh;
+  }
+
+  .bg {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(106,13,173,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(201,150,58,0.08) 0%, transparent 50%),
+      var(--deep);
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 600px; margin: 0 auto; padding: 24px 16px; }
+
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  /* HEADER */
+  .app-header { text-align: center; margin-bottom: 24px; }
+  .app-title { font-size: 22px; color: var(--gold-light); font-weight: 700; margin-bottom: 4px; }
+  .app-subtitle { font-size: 12px; color: rgba(253,246,255,0.4); letter-spacing: 2px; }
+  .user-badge { display:inline-block; margin-top:10px; padding:6px 16px; background:rgba(106,13,173,0.2); border:1px solid rgba(201,150,58,0.3); border-radius:20px; font-size:13px; color:var(--gold-light); }
+
+  .gold-line { height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:16px 0; }
+
+  /* FORM */
+  .form-group { margin-bottom: 16px; }
+  .form-label { display:block; font-size:12px; color:var(--gold); letter-spacing:2px; margin-bottom:6px; }
+  .form-input { width:100%; padding:13px 16px; background:rgba(106,13,173,0.1); border:1px solid rgba(201,150,58,0.3); border-radius:3px; color:var(--cream); font-family:'Noto Serif Hebrew',serif; font-size:15px; outline:none; transition:border-color 0.2s; }
+  .form-input:focus { border-color:var(--gold); background:rgba(106,13,173,0.2); }
+  .form-input::placeholder { color:rgba(253,246,255,0.25); }
+  .error-msg { color:#e74c3c; font-size:13px; margin-top:8px; display:none; }
+
+  /* BUTTONS */
+  .btn { width:100%; padding:14px; border:none; border-radius:3px; font-family:'Noto Serif Hebrew',serif; font-size:15px; font-weight:600; cursor:pointer; transition:all 0.2s; letter-spacing:1px; }
+  .btn-gold { background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:var(--deep); box-shadow:0 4px 15px rgba(201,150,58,0.3); }
+  .btn-gold:hover { transform:translateY(-1px); }
+  .btn-purple { background:linear-gradient(135deg,var(--purple-dark),var(--purple-light)); color:var(--cream); box-shadow:0 4px 15px rgba(106,13,173,0.3); }
+  .btn-purple:hover { transform:translateY(-1px); }
+  .btn-outline { background:transparent; border:1px solid rgba(201,150,58,0.3); color:rgba(253,246,255,0.5); font-size:13px; padding:10px; }
+  .btn-outline:hover { border-color:var(--gold); color:var(--gold); }
+  .btn-danger-outline { background:transparent; border:1px solid rgba(231,76,60,0.3); color:rgba(231,76,60,0.6); font-size:13px; padding:10px; }
+  .btn-danger-outline:hover { border-color:#e74c3c; color:#e74c3c; }
+  .btn-sm { padding:8px 14px; font-size:13px; width:auto; border-radius:3px; border:none; cursor:pointer; font-family:'Noto Serif Hebrew',serif; transition:all 0.2s; }
+
+  /* LOGIN */
+  .login-card { background:rgba(106,13,173,0.1); border:1px solid rgba(201,150,58,0.25); border-radius:6px; padding:28px 24px; text-align:center; }
+  .login-icon { font-size:40px; margin-bottom:16px; }
+  .login-title { font-size:20px; color:var(--gold-light); margin-bottom:4px; }
+  .login-sub { font-size:12px; color:rgba(253,246,255,0.4); margin-bottom:24px; letter-spacing:1px; }
+
+  /* SETTINGS */
+  .settings-card { background:rgba(106,13,173,0.08); border:1px solid rgba(201,150,58,0.2); border-radius:6px; padding:20px; margin-bottom:20px; }
+  .settings-title { font-size:13px; color:var(--gold); letter-spacing:2px; margin-bottom:16px; }
+  .settings-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .setting-box { background:rgba(106,13,173,0.1); border:1px solid rgba(201,150,58,0.15); border-radius:4px; padding:14px; text-align:center; }
+  .setting-label { font-size:11px; color:rgba(253,246,255,0.5); letter-spacing:1px; margin-bottom:8px; }
+  .setting-control { display:flex; align-items:center; justify-content:center; gap:10px; }
+  .setting-btn { width:32px; height:32px; background:rgba(201,150,58,0.15); border:1px solid rgba(201,150,58,0.3); border-radius:3px; color:var(--gold); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .setting-btn:hover { background:rgba(201,150,58,0.25); }
+  .setting-val { font-size:22px; color:var(--gold-light); font-weight:700; min-width:40px; text-align:center; }
+
+  /* STATS */
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+  .stat-box { background:rgba(106,13,173,0.12); border:1px solid rgba(201,150,58,0.2); border-radius:4px; padding:12px 8px; text-align:center; }
+  .stat-num { font-size:24px; color:var(--gold-light); font-weight:700; line-height:1; }
+  .stat-label { font-size:10px; color:rgba(253,246,255,0.4); letter-spacing:1px; margin-top:4px; }
+
+  /* UNASSIGNED */
+  .unassigned-box { background:rgba(231,76,60,0.06); border:1px solid rgba(231,76,60,0.2); border-radius:6px; padding:16px; margin-bottom:20px; }
+  .unassigned-title { font-size:12px; color:#e74c3c; letter-spacing:2px; margin-bottom:10px; }
+  .unassigned-list { display:flex; flex-wrap:wrap; gap:6px; }
+  .guest-chip { padding:6px 12px; background:rgba(106,13,173,0.15); border:1px solid rgba(201,150,58,0.2); border-radius:20px; font-size:12px; color:var(--cream); cursor:pointer; transition:all 0.2s; }
+  .guest-chip:hover { border-color:var(--gold); color:var(--gold-light); }
+
+  /* TABLES GRID */
+  .tables-grid { display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:20px; }
+  @media(min-width:480px) { .tables-grid { grid-template-columns:1fr 1fr; } }
+
+  .table-card { background:rgba(106,13,173,0.08); border:1px solid rgba(201,150,58,0.2); border-radius:6px; padding:16px; }
+  .table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .table-name { font-size:15px; color:var(--gold-light); font-weight:600; }
+  .table-count { font-size:12px; color:rgba(253,246,255,0.4); }
+  .table-capacity { height:4px; background:rgba(255,255,255,0.08); border-radius:2px; margin-bottom:12px; overflow:hidden; }
+  .table-capacity-bar { height:100%; background:linear-gradient(90deg,var(--purple-dark),var(--purple-light)); border-radius:2px; transition:width 0.3s; }
+  .table-capacity-bar.full { background:linear-gradient(90deg,#c0392b,#e74c3c); }
+
+  .table-guests { display:flex; flex-direction:column; gap:4px; min-height:40px; }
+  .table-guest-row { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:3px; }
+  .table-guest-name { font-size:13px; color:var(--cream); flex:1; }
+  .table-guest-side { font-size:11px; color:rgba(253,246,255,0.35); margin-left:6px; }
+  .table-guest-remove { background:transparent; border:none; color:rgba(231,76,60,0.4); cursor:pointer; font-size:14px; padding:2px 6px; transition:color 0.2s; }
+  .table-guest-remove:hover { color:#e74c3c; }
+  .table-empty { font-size:12px; color:rgba(253,246,255,0.2); text-align:center; padding:12px; letter-spacing:1px; }
+
+  .table-add-btn { width:100%; margin-top:10px; padding:8px; background:transparent; border:1px dashed rgba(201,150,58,0.2); border-radius:3px; color:rgba(253,246,255,0.3); font-family:'Noto Serif Hebrew',serif; font-size:12px; cursor:pointer; transition:all 0.2s; }
+  .table-add-btn:hover { border-color:var(--gold); color:var(--gold); }
+
+  /* MODAL */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:50; display:none; align-items:center; justify-content:center; padding:20px; }
+  .modal-overlay.open { display:flex; }
+  .modal-card { background:#1a0030; border:1px solid rgba(201,150,58,0.3); border-radius:8px; padding:24px; width:100%; max-width:400px; max-height:80vh; overflow-y:auto; animation:fadeIn 0.3s ease; }
+  .modal-title { font-size:16px; color:var(--gold-light); margin-bottom:16px; text-align:center; }
+  .modal-guest-list { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .modal-guest-item { padding:10px 14px; background:rgba(106,13,173,0.1); border:1px solid rgba(201,150,58,0.15); border-radius:4px; cursor:pointer; transition:all 0.2s; }
+  .modal-guest-item:hover { border-color:var(--gold); background:rgba(106,13,173,0.2); }
+  .modal-guest-name { font-size:14px; color:var(--cream); }
+  .modal-guest-meta { font-size:11px; color:rgba(253,246,255,0.35); margin-top:2px; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--success); color:white; padding:12px 24px; border-radius:4px; font-size:14px; z-index:100; transition:transform 0.3s; white-space:nowrap; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.err { background:var(--danger); }
+
+  .logout-btn { text-align:center; font-size:11px; color:rgba(253,246,255,0.2); cursor:pointer; margin-top:16px; letter-spacing:1px; }
+  .logout-btn:hover { color:rgba(253,246,255,0.5); }
+
+  .section-title { font-size:11px; letter-spacing:3px; color:var(--gold); margin-bottom:12px; opacity:0.8; }
+
+  .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+
+  /* ===== תוספות גרסה חדשה ===== */
+  .view-only-banner { background:rgba(201,150,58,0.14); border:1px solid rgba(201,150,58,0.45);
+    border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:13px;
+    color:#f0e0bd; text-align:center; }
+  .hall-summary { text-align:center; font-size:12px; color:rgba(253,246,255,0.45);
+    margin:-4px 0 14px; letter-spacing:0.5px; }
+  .rsvp-tag { font-size:10px; padding:1px 6px; border-radius:8px; margin-inline-start:4px; }
+  .rsvp-ok   { background:rgba(169,223,191,0.18); color:#a9dfbf; }
+  .rsvp-no   { background:rgba(231,76,60,0.18);  color:#f1948a; }
+  .rsvp-wait { background:rgba(255,255,255,0.08); color:rgba(253,246,255,0.5); }
+  .chip-ok   { border-color:rgba(169,223,191,0.5) !important; }
+  .chip-wait { opacity:0.75; }
+  .chip-no   { border-color:rgba(231,76,60,0.4) !important; color:#f1948a !important;
+               cursor:default !important; }
+  .item-full { opacity:0.45; }
+  .table-move-btn { background:none; border:none; color:var(--purple-light); font-size:15px;
+    cursor:pointer; padding:0 4px; }
+  .declined-box { background:rgba(231,76,60,0.07); border:1px solid rgba(231,76,60,0.25);
+    border-radius:12px; padding:12px 14px; margin-bottom:16px; }
+  .declined-title { font-size:12px; color:#f1948a; margin-bottom:8px; }
+  .modal-sub { font-size:12px; color:rgba(253,246,255,0.5); text-align:center;
+    margin:-6px 0 12px; line-height:1.5; }
+
+  /* ===== הדפסה ===== */
+  #printArea { display:none; }
+  @media print {
+    body * { visibility:hidden !important; }
+    #printArea, #printArea * { visibility:visible !important; }
+    #printArea { display:block !important; position:absolute; inset:0; width:100%;
+      background:#fff; color:#000; padding:12mm; direction:rtl;
+      font-family:Arial, "Noto Serif Hebrew", serif; }
+    #printArea h1 { font-size:20pt; text-align:center; margin:0 0 4px; }
+    #printArea .print-sub { text-align:center; font-size:10pt; color:#555; margin-bottom:14px; }
+    #printArea table { width:100%; border-collapse:collapse; font-size:11pt; }
+    #printArea th, #printArea td { border:1px solid #999; padding:5px 8px; text-align:right; }
+    #printArea th { background:#eee; }
+    #printArea .tnum { font-size:14pt; font-weight:bold; text-align:center; }
+    #printArea tr { page-break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="container">
+
+  <!-- LOGIN -->
+  <div class="page active" id="page-login">
+    <div class="app-header">
+      <div class="app-title">סידור שולחנות</div>
+      <div class="app-subtitle">חתונה | אמרי & ליטל חמרי</div>
+    </div>
+    <div class="login-card">
+      <div class="login-icon">💜</div>
+      <div class="login-title">כניסה למערכת</div>
+      <div class="login-sub">רק לאמרי ולליטל</div>
+      <div class="form-group">
+        <label class="form-label">שם</label>
+        <input class="form-input" id="loginName" type="text" placeholder="אמרי / ליטל"
+          onkeydown="if(event.key==='Enter') document.getElementById('loginCode').focus()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">קוד אישי</label>
+        <input class="form-input" id="loginCode" type="password" inputmode="numeric"
+          placeholder="קוד מספרי" onkeydown="if(event.key==='Enter') doLogin()" />
+        <div class="error-msg" id="loginError">❌ שם או קוד שגוי</div>
+      </div>
+      <button class="btn btn-gold" onclick="doLogin()">כניסה ←</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="page" id="page-main">
+    <div class="app-header">
+      <div class="app-title">🪑 סידור שולחנות</div>
+      <div class="app-subtitle">חתונה | אמרי & ליטל חמרי</div>
+      <div class="user-badge" id="userBadge">👤</div>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings-card">
+      <div class="settings-title">⚙️ הגדרות אולם</div>
+      <div class="settings-row">
+        <div class="setting-box editor-only">
+          <div class="setting-label">מספר שולחנות</div>
+          <div class="setting-control">
+            <button class="setting-btn" onclick="changeSetting('tables', -1)">−</button>
+            <div class="setting-val" id="valTables">10</div>
+            <button class="setting-btn" onclick="changeSetting('tables', 1)">+</button>
+          </div>
+        </div>
+        <div class="setting-box editor-only">
+          <div class="setting-label">מקומות בשולחן</div>
+          <div class="setting-control">
+            <button class="setting-btn" onclick="changeSetting('seats', -1)">−</button>
+            <div class="setting-val" id="valSeats">10</div>
+            <button class="setting-btn" onclick="changeSetting('seats', 1)">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row editor-only">
+        <button class="btn btn-purple" onclick="autoArrange()">✨ סידור אוטומטי</button>
+        <button class="btn btn-danger-outline" onclick="resetArrangement()">🔄 אפס הכל</button>
+      </div>
+    </div>
+
+    <div class="view-only-banner" id="viewOnlyBanner" style="display:none;">
+      👁️ צפייה בלבד — הסידור מתעדכן בזמן אמת. רק ליטל יכולה לערוך.
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">מוזמנים</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statSeated" style="color:#a9dfbf;">0</div>
+        <div class="stat-label">משובצים</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statLeft" style="color:#e74c3c;">0</div>
+        <div class="stat-label">ממתינים</div>
+      </div>
+    </div>
+
+    <div class="hall-summary" id="hallSummary"></div>
+
+    <!-- Unassigned -->
+    <div class="unassigned-box" id="unassignedBox" style="display:none;">
+      <div class="unassigned-title">⚠️ ממתינים לשיבוץ — לחץ על שם כדי לשבץ</div>
+      <div class="unassigned-list" id="unassignedList"></div>
+    </div>
+
+    <!-- Declined -->
+    <div class="declined-box" id="declinedBox" style="display:none;">
+      <div class="declined-title">❌ סימנו שלא יגיעו — לא משובצים</div>
+      <div class="unassigned-list" id="declinedList"></div>
+    </div>
+
+    <!-- Tables -->
+    <div class="section-title">שולחנות</div>
+    <div class="tables-grid" id="tablesGrid"></div>
+
+    <div class="gold-line"></div>
+    <button class="btn btn-outline" onclick="printAlphabetical()" style="margin-bottom:10px;">🖨️ הדפסת רשימה אלפביתית</button>
+    <button class="btn btn-outline" onclick="openBackups()" style="margin-bottom:10px;">💾 גיבויים ושחזור</button>
+    <button class="btn btn-outline" onclick="exportExcel()" style="margin-bottom:10px;">📥 ייצוא לאקסל</button>
+    <div class="logout-btn" onclick="doLogout()">⬅ יציאה</div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Modal: בחר שולחן למוזמן לא משובץ -->
+<div class="modal-overlay" id="tablePickModal">
+  <div class="modal-card">
+    <div class="modal-title" id="tablePickTitle">בחר שולחן</div>
+    <div class="modal-guest-list" id="tablePickList"></div>
+    <button class="btn btn-outline" onclick="closeModal('tablePickModal')">ביטול</button>
+  </div>
+</div>
+
+<!-- Modal: הוסף מוזמן לשולחן ספציפי -->
+<div class="modal-overlay" id="addGuestModal">
+  <div class="modal-card">
+    <div class="modal-title" id="addGuestTitle">הוסף מוזמן לשולחן</div>
+    <div style="margin-bottom:10px;">
+      <input class="form-input" id="addGuestSearch" type="text" placeholder="חפש שם..." oninput="filterAddGuest()" />
+    </div>
+    <div class="modal-guest-list" id="addGuestList"></div>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('addGuestModal')">ביטול</button>
+  </div>
+</div>
+
+<!-- Modal: העברה בין שולחנות -->
+<div class="modal-overlay" id="moveModal">
+  <div class="modal-card">
+    <div class="modal-title" id="moveTitle">העברה</div>
+    <div class="modal-sub">בחר/י שולחן יעד. שולחן מלא — תישאל/י מי יוצא במקומו.</div>
+    <div class="modal-guest-list" id="moveList"></div>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="moveToWaiting()">↩ הוצא לרשימת הממתינים</button>
+    <button class="btn btn-outline" style="margin-top:6px;" onclick="closeModal('moveModal')">ביטול</button>
+  </div>
+</div>
+
+<!-- Modal: החלפה בשולחן מלא -->
+<div class="modal-overlay" id="swapModal">
+  <div class="modal-card">
+    <div class="modal-title" id="swapTitle">מי יוצא?</div>
+    <div class="modal-sub" id="swapSubtitle"></div>
+    <div class="modal-guest-list" id="swapList"></div>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('swapModal')">ביטול</button>
+  </div>
+</div>
+
+<!-- Modal: גיבויים -->
+<div class="modal-overlay" id="backupModal">
+  <div class="modal-card">
+    <div class="modal-title">גיבויים אחרונים</div>
+    <div class="modal-sub">גיבוי נשמר אוטומטית לפני כל סידור אוטומטי ולפני איפוס.</div>
+    <div class="modal-guest-list" id="backupList"></div>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('backupModal')">סגור</button>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, get, remove }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAL4-i_i2jQRroANmCZjqT6tfe2FLtqzHM",
+    authDomain: "wedding-2026-3e0fa.firebaseapp.com",
+    databaseURL: "https://wedding-2026-3e0fa-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "wedding-2026-3e0fa",
+    storageBucket: "wedding-2026-3e0fa.firebasestorage.app",
+    messagingSenderId: "914558750917",
+    appId: "1:914558750917:web:449d75eeb78202e782a0ac"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  window._db          = db;
+  window._ref         = ref;
+  window._onValue     = onValue;
+  window._set         = set;
+  window._get         = get;
+  window._remove      = remove;
+  window._firebaseReady = true;
+  window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<script>
+  // ===== משתמשים והרשאות =====
+  // עריכה: ליטל בלבד. כל השאר — צפייה בזמן אמת.
+  const USERS = {
+    "ליטל": { code: "7236", canEdit: true  },
+    "אמרי": { code: "9325", canEdit: false },
+    "דרור": { code: "2183", canEdit: false }
+  };
+
+  const RESET_PASSWORD = "5555";
+  const MAX_BACKUPS    = 5;
+
+  const SIDE_ORDER = ['amri','lital','dror','bracha','shoshana','shai'];
+  const KEY_TO_NAME = { amri:'אמרי', lital:'ליטל', dror:'דרור', bracha:'ברכה', shoshana:'שושי', shai:'שי' };
+  const CAT_ORDER   = ['משפחה','חברים','עבודה','שכנים','אחר'];
+
+  let currentUser  = null;
+  let canEdit      = false;
+  let allGuests    = []; // { id, name, phone, category, side, sideKey, rsvp, people }
+  let tables       = []; // [{ id, guests:[], label }]
+  let numTables    = 10;
+  let seatsPerTable = 10;
+  let manualEdits  = false;   // האם נעשו שינויים ידניים מאז הסידור האוטומטי
+  let addingToTable = null;
+  let moveCtx      = null;    // { fromTableId, guestId }
+  let backupsList  = [];
+  let listenersOn  = false;
+  let applyingRemote = false; // מונע שמירה חוזרת בזמן קליטת עדכון מרחוק
+
+  // ===== LOGIN =====
+  function doLogin() {
+    const name = document.getElementById('loginName').value.trim();
+    const code = document.getElementById('loginCode').value.trim();
+    const err  = document.getElementById('loginError');
+    const user = USERS[name];
+    if (user && user.code === code) {
+      err.style.display = 'none';
+      currentUser = name;
+      canEdit     = !!user.canEdit;
+      document.getElementById('loginCode').value = '';
+      startSession();
+    } else {
+      err.style.display = 'block';
+    }
+  }
+  window.doLogin = doLogin;
+
+  function doLogout() {
+    currentUser = null; canEdit = false;
+    document.getElementById('loginName').value = '';
+    showPage('page-login');
+  }
+  window.doLogout = doLogout;
+
+  function startSession() {
+    document.getElementById('userBadge').textContent = `👤 ${currentUser}`;
+    document.getElementById('viewOnlyBanner').style.display = canEdit ? 'none' : 'block';
+    document.querySelectorAll('.editor-only').forEach(el => {
+      el.style.display = canEdit ? '' : 'none';
+    });
+    showPage('page-main');
+    loadData();
+  }
+
+  function requireEdit() {
+    if (!canEdit) { showToast('צפייה בלבד — רק ליטל יכולה לערוך', true); return false; }
+    return true;
+  }
+
+  // ===== SETTINGS =====
+  function changeSetting(type, delta) {
+    if (!requireEdit()) return;
+    if (type === 'tables') {
+      numTables = Math.max(1, Math.min(50, numTables + delta));
+      document.getElementById('valTables').textContent = numTables;
+    } else {
+      seatsPerTable = Math.max(1, Math.min(30, seatsPerTable + delta));
+      document.getElementById('valSeats').textContent = seatsPerTable;
+    }
+    while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
+    while (tables.length > numTables) tables.pop();   // היושבים חוזרים אוטומטית לרשימת הממתינים
+    markManual();
+    saveArrangement();
+    renderAll();
+  }
+  window.changeSetting = changeSetting;
+
+  // ===== טעינת נתונים =====
+  function loadData() {
+    if (!window._firebaseReady) {
+      window.addEventListener('firebaseReady', loadData, { once: true });
+      return;
+    }
+    if (listenersOn) return;   // רישום מאזינים פעם אחת בלבד
+    listenersOn = true;
+
+    // רשימת המוזמנים
+    window._onValue(window._ref(window._db, 'guests'), (snap) => {
+      const data = snap.val() || {};
+      const list = [];
+      for (const [userKey, userGuests] of Object.entries(data)) {
+        if (!userGuests) continue;
+        for (const [id, g] of Object.entries(userGuests)) {
+          if (g && g.name) {
+            list.push({
+              id: userKey + '_' + id,
+              name: g.name,
+              phone: g.phone || '',
+              category: g.category || 'אחר',
+              side: KEY_TO_NAME[userKey] || userKey,
+              sideKey: userKey,
+              rsvp: 'pending',
+              people: 1
+            });
+          }
+        }
+      }
+      allGuests = list;
+      applyRsvp();
+      renderAll();
+    });
+
+    // אישורי הגעה
+    window._onValue(window._ref(window._db, 'wedding_rsvp'), (snap) => {
+      const data = snap.val() || {};
+      rsvpById = {}; rsvpByPhone = {};
+      for (const [key, e] of Object.entries(data)) {
+        if (!e) continue;
+        const rec = { attending: !!e.attending, guests: e.guests || 0 };
+        const gid = e.guestId || (key.includes('_') ? key : null);
+        if (gid) rsvpById[gid] = rec;
+        if (e.phone) rsvpByPhone[localPhone(e.phone)] = rec;
+      }
+      applyRsvp();
+      renderAll();
+    });
+
+    // הסידור עצמו — מאזין חי, מתעדכן בזמן אמת אצל כולם
+    window._onValue(window._ref(window._db, 'seating'), (snap) => {
+      const data = snap.val();
+      applyingRemote = true;
+      if (data) {
+        numTables     = data.numTables     || 10;
+        seatsPerTable = data.seatsPerTable || 10;
+        manualEdits   = !!data.manual;
+        tables = (data.tables || []).map(t => ({
+          id: t.id, guests: t.guests || [], label: t.label || ''
+        }));
+        while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
+      } else {
+        tables = [];
+        for (let i = 1; i <= numTables; i++) tables.push({ id: i, guests: [], label: '' });
+      }
+      document.getElementById('valTables').textContent = numTables;
+      document.getElementById('valSeats').textContent  = seatsPerTable;
+      applyingRemote = false;
+      renderAll();
+    });
+
+    // גיבויים
+    window._onValue(window._ref(window._db, 'seating_backups'), (snap) => {
+      const data = snap.val() || {};
+      backupsList = Object.entries(data)
+        .map(([k, v]) => ({ key: k, ts: v.ts || 0, label: v.label || '', seated: v.seated || 0 }))
+        .sort((a, b) => b.ts - a.ts);
+    });
+  }
+
+  let rsvpById = {}, rsvpByPhone = {};
+
+  function localPhone(raw) {
+    let p = (raw || '').replace(/[-\s().+]/g, '').replace(/[oO]/g, '0');
+    if (p.startsWith('972')) p = '0' + p.slice(3);
+    return p;
+  }
+
+  // שיוך אישורי הגעה: קודם לפי מזהה אישי, ואם אין — לפי טלפון
+  function applyRsvp() {
+    for (const g of allGuests) {
+      const r = rsvpById[g.id] || (g.phone ? rsvpByPhone[localPhone(g.phone)] : null);
+      if (!r) { g.rsvp = 'pending'; g.people = 1; continue; }
+      g.rsvp   = r.attending ? 'confirmed' : 'declined';
+      g.people = r.attending ? Math.max(1, r.guests || 1) : 0;
+    }
+  }
+
+  // ===== עזרי חישוב =====
+  function guestById(id) { return allGuests.find(g => g.id === id); }
+
+  // מוזמנים שיושבים בשולחן, בלי מזהים יתומים של מי שנמחק מהרשימה
+  function seatedOf(t) { return t.guests.map(guestById).filter(Boolean); }
+
+  // תפוסה נספרת לפי אנשים, לא לפי רשומות
+  function occupancy(t) { return seatedOf(t).reduce((s, g) => s + Math.max(1, g.people), 0); }
+  function freeSeats(t) { return seatsPerTable - occupancy(t); }
+
+  function seatedIdSet() {
+    const s = new Set();
+    tables.forEach(t => t.guests.forEach(id => s.add(id)));
+    return s;
+  }
+
+  // ===== שמירה =====
+  function markManual() { manualEdits = true; }
+
+  async function saveArrangement() {
+    if (!window._firebaseReady || applyingRemote) return;
+    await window._set(window._ref(window._db, 'seating'), {
+      numTables, seatsPerTable, manual: manualEdits,
+      tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })),
+      updatedBy: currentUser || '', updatedAt: Date.now()
+    });
+  }
+
+  // ===== גיבוי ושחזור =====
+  async function makeBackup(label) {
+    if (!window._firebaseReady) return;
+    const seated = tables.reduce((s, t) => s + occupancy(t), 0);
+    const key = 'b' + Date.now();
+    await window._set(window._ref(window._db, 'seating_backups/' + key), {
+      ts: Date.now(), label: label || '', seated,
+      data: { numTables, seatsPerTable, manual: manualEdits,
+              tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })) }
+    });
+    // שמור רק את 5 האחרונים
+    const snap = await window._get(window._ref(window._db, 'seating_backups'));
+    const all  = snap.exists() ? snap.val() : {};
+    const keys = Object.entries(all)
+      .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
+      .map(e => e[0]);
+    for (const old of keys.slice(MAX_BACKUPS)) {
+      await window._set(window._ref(window._db, 'seating_backups/' + old), null);
+    }
+  }
+
+  function openBackups() {
+    const list = document.getElementById('backupList');
+    if (backupsList.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:rgba(253,246,255,0.35);padding:20px;">אין גיבויים עדיין</div>';
+    } else {
+      list.innerHTML = backupsList.map(b => {
+        const d = new Date(b.ts);
+        const when = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        return `<div class="modal-guest-item" ${canEdit ? `onclick="restoreBackup('${b.key}')"` : ''}>
+                  <div class="modal-guest-name">${when} — ${b.seated} משובצים</div>
+                  <div class="modal-guest-meta">${b.label || 'גיבוי'}${canEdit ? ' · לחץ לשחזור' : ''}</div>
+                </div>`;
+      }).join('');
+    }
+    document.getElementById('backupModal').classList.add('open');
+  }
+  window.openBackups = openBackups;
+
+  async function restoreBackup(key) {
+    if (!requireEdit()) return;
+    if (!confirm('לשחזר את הגיבוי הזה?\nהסידור הנוכחי ייגבה קודם.')) return;
+    await makeBackup('לפני שחזור');
+    const snap = await window._get(window._ref(window._db, 'seating_backups/' + key));
+    if (!snap.exists()) { showToast('הגיבוי לא נמצא', true); return; }
+    const d = snap.val().data || {};
+    numTables     = d.numTables     || numTables;
+    seatsPerTable = d.seatsPerTable || seatsPerTable;
+    manualEdits   = !!d.manual;
+    tables = (d.tables || []).map(t => ({ id: t.id, guests: t.guests || [], label: t.label || '' }));
+    document.getElementById('valTables').textContent = numTables;
+    document.getElementById('valSeats').textContent  = seatsPerTable;
+    await saveArrangement();
+    renderAll();
+    closeModal('backupModal');
+    showToast('↩️ הסידור שוחזר');
+  }
+  window.restoreBackup = restoreBackup;
+
+  // ===== סידור אוטומטי =====
+  // רק מי שאישר הגעה. קיבוץ לפי צד × קטגוריה, וספירה לפי אנשים.
+  async function autoArrange() {
+    if (!requireEdit()) return;
+
+    const confirmed = allGuests.filter(g => g.rsvp === 'confirmed');
+    if (confirmed.length === 0) {
+      showToast('אין עדיין מוזמנים שאישרו הגעה', true);
+      return;
+    }
+
+    if (manualEdits && tables.some(t => t.guests.length > 0)) {
+      const seated = tables.reduce((s, t) => s + occupancy(t), 0);
+      const pwd = prompt(`⚠️ קיים סידור עם שינויים ידניים (${seated} משובצים).\nסידור אוטומטי ימחק אותו.\n\nהקלד סיסמה כדי להמשיך:`);
+      if (pwd !== RESET_PASSWORD) { if (pwd !== null) showToast('סיסמה שגויה', true); return; }
+    } else {
+      if (!confirm('לבצע סידור אוטומטי?\nהסידור הנוכחי ייגבה קודם.')) return;
+    }
+
+    await makeBackup('לפני סידור אוטומטי');
+
+    // קבוצות: צד × קטגוריה
+    const groups = [];
+    for (const sideKey of SIDE_ORDER) {
+      for (const cat of CAT_ORDER) {
+        const members = confirmed.filter(g => g.sideKey === sideKey && g.category === cat);
+        if (members.length) groups.push({ side: KEY_TO_NAME[sideKey] || sideKey, cat, members });
+      }
+    }
+
+    // פיצול לשולחנות לפי מספר אנשים — משפחה נשארת שלמה באותו שולחן
+    const planned = [];
+    for (const grp of groups) {
+      let chunk = [], used = 0;
+      for (const g of grp.members) {
+        const p = Math.max(1, g.people);
+        if (used + p > seatsPerTable && chunk.length) {
+          planned.push({ grp, members: chunk }); chunk = []; used = 0;
+        }
+        chunk.push(g); used += p;
+      }
+      if (chunk.length) planned.push({ grp, members: chunk });
+    }
+
+    const total = Math.max(numTables, planned.length);
+    tables = [];
+    for (let i = 1; i <= total; i++) tables.push({ id: i, guests: [], label: '' });
+    if (total > numTables) {
+      numTables = total;
+      document.getElementById('valTables').textContent = numTables;
+    }
+
+    planned.forEach((p, i) => {
+      tables[i].guests = p.members.map(g => g.id);
+      tables[i].label  = `${p.grp.side} · ${p.grp.cat}`;
+    });
+
+    manualEdits = false;
+    await saveArrangement();
+    renderAll();
+    showToast(`✨ סודרו ${planned.length} שולחנות`);
+  }
+  window.autoArrange = autoArrange;
+
+  async function resetArrangement() {
+    if (!requireEdit()) return;
+    const seated = tables.reduce((s, t) => s + occupancy(t), 0);
+    if (seated > 0) {
+      const pwd = prompt(`⚠️ יימחק סידור של ${seated} משובצים.\nגיבוי יישמר אוטומטית.\n\nהקלד סיסמה כדי להמשיך:`);
+      if (pwd !== RESET_PASSWORD) { if (pwd !== null) showToast('סיסמה שגויה', true); return; }
+      await makeBackup('לפני איפוס');
+    }
+    tables = [];
+    for (let i = 1; i <= numTables; i++) tables.push({ id: i, guests: [], label: '' });
+    manualEdits = false;
+    await saveArrangement();
+    renderAll();
+    showToast('🔄 הסידור אופס');
+  }
+  window.resetArrangement = resetArrangement;
+
+  // ===== תצוגה =====
+  function renderAll() { renderTables(); updateStats(); }
+
+  function statusTag(g) {
+    if (g.rsvp === 'confirmed') return `<span class="rsvp-tag rsvp-ok">✔ ${g.people}</span>`;
+    if (g.rsvp === 'declined')  return `<span class="rsvp-tag rsvp-no">✕ לא מגיע</span>`;
+    return `<span class="rsvp-tag rsvp-wait">? לא ענה</span>`;
+  }
+
+  function renderTables() {
+    const grid = document.getElementById('tablesGrid');
+    const seated = seatedIdSet();
+
+    // ממתינים לשיבוץ — מי שאישר או שטרם ענה. מי שסירב מוצג בנפרד.
+    const waiting  = allGuests.filter(g => !seated.has(g.id) && g.rsvp !== 'declined');
+    const declined = allGuests.filter(g => g.rsvp === 'declined');
+
+    const uBox  = document.getElementById('unassignedBox');
+    const uList = document.getElementById('unassignedList');
+    if (waiting.length) {
+      uBox.style.display = 'block';
+      uList.innerHTML = waiting.map(g =>
+        `<span class="guest-chip ${g.rsvp === 'confirmed' ? 'chip-ok' : 'chip-wait'}"
+           ${canEdit ? `onclick="pickTableForGuest('${g.id}')"` : ''}>
+           ${g.name}${g.rsvp === 'confirmed' ? ` (${g.people})` : ''}
+         </span>`).join('');
+    } else {
+      uBox.style.display = 'none';
+    }
+
+    const dBox = document.getElementById('declinedBox');
+    if (declined.length) {
+      dBox.style.display = 'block';
+      document.getElementById('declinedList').innerHTML =
+        declined.map(g => `<span class="guest-chip chip-no">${g.name}</span>`).join('');
+    } else {
+      dBox.style.display = 'none';
+    }
+
+    grid.innerHTML = tables.map(t => {
+      const list = seatedOf(t);
+      const occ  = occupancy(t);
+      const pct  = Math.min(100, Math.round(occ / seatsPerTable * 100));
+      const full = occ >= seatsPerTable;
+
+      return `
+        <div class="table-card">
+          <div class="table-header">
+            <div>
+              <div class="table-name">שולחן ${t.id}</div>
+              ${t.label ? `<div style="font-size:11px;color:var(--purple-light);margin-top:2px;">${t.label}</div>` : ''}
+            </div>
+            <div class="table-count">${occ}/${seatsPerTable}</div>
+          </div>
+          <div class="table-capacity">
+            <div class="table-capacity-bar ${full ? 'full' : ''}" style="width:${pct}%"></div>
+          </div>
+          <div class="table-guests">
+            ${list.length === 0
+              ? '<div class="table-empty">ריק</div>'
+              : list.map(g => `
+                <div class="table-guest-row">
+                  <div class="table-guest-name">${g.name}${g.people > 1 ? ` <span style="opacity:.6">(${g.people})</span>` : ''}</div>
+                  <div class="table-guest-side">${g.side}</div>
+                  ${canEdit ? `<button class="table-move-btn" onclick="openMove(${t.id}, '${g.id}')">⇄</button>
+                               <button class="table-guest-remove" onclick="removeFromTable(${t.id}, '${g.id}')">✕</button>` : ''}
+                </div>`).join('')
+            }
+          </div>
+          ${canEdit && !full ? `<button class="table-add-btn" onclick="openAddGuest(${t.id})">+ הוסף מוזמן</button>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function updateStats() {
+    const confirmedPeople = allGuests.filter(g => g.rsvp === 'confirmed')
+                                     .reduce((s, g) => s + g.people, 0);
+    const seatedPeople = tables.reduce((s, t) => s + occupancy(t), 0);
+    const seated = seatedIdSet();
+    const waiting = allGuests.filter(g => !seated.has(g.id) && g.rsvp !== 'declined').length;
+
+    document.getElementById('statTotal').textContent  = confirmedPeople;
+    document.getElementById('statSeated').textContent = seatedPeople;
+    document.getElementById('statLeft').textContent   = waiting;
+
+    const usedTables = tables.filter(t => occupancy(t) > 0).length;
+    document.getElementById('hallSummary').textContent =
+      `${usedTables} שולחנות בשימוש · ${seatedPeople} סועדים`;
+  }
+
+  // ===== הסרה =====
+  function removeFromTable(tableId, guestId) {
+    if (!requireEdit()) return;
+    const t = tables.find(t => t.id === tableId);
+    if (!t) return;
+    t.guests = t.guests.filter(id => id !== guestId);
+    markManual(); saveArrangement(); renderAll();
+  }
+  window.removeFromTable = removeFromTable;
+
+  // ===== שיבוץ ממתין =====
+  function pickTableForGuest(guestId) {
+    if (!requireEdit()) return;
+    const g = guestById(guestId);
+    if (!g) return;
+    const need = Math.max(1, g.people);
+
+    document.getElementById('tablePickTitle').textContent = `בחר שולחן עבור ${g.name}${need > 1 ? ` (${need} אנשים)` : ''}`;
+    document.getElementById('tablePickList').innerHTML = tables.map(t => {
+      const free = freeSeats(t);
+      const ok   = free >= need;
+      return `<div class="modal-guest-item ${ok ? '' : 'item-full'}"
+                onclick="${ok ? `assignToTable(${t.id}, '${guestId}')` : `showToast('בשולחן ${t.id} נותרו ${free} מקומות בלבד', true)`}">
+                <div class="modal-guest-name">שולחן ${t.id} ${ok ? '' : '— אין מספיק מקום'}</div>
+                <div class="modal-guest-meta">${occupancy(t)}/${seatsPerTable} תפוסים · ${free} פנויים</div>
+              </div>`;
+    }).join('');
+    document.getElementById('tablePickModal').classList.add('open');
+  }
+  window.pickTableForGuest = pickTableForGuest;
+
+  function assignToTable(tableId, guestId) {
+    if (!requireEdit()) return;
+    const t = tables.find(t => t.id === tableId);
+    if (!t || t.guests.includes(guestId)) return;
+    tables.forEach(tb => { tb.guests = tb.guests.filter(id => id !== guestId); });
+    t.guests.push(guestId);
+    markManual(); saveArrangement(); renderAll();
+    closeModal('tablePickModal'); closeModal('addGuestModal');
+    showToast('✅ שובץ לשולחן ' + tableId);
+  }
+  window.assignToTable = assignToTable;
+
+  // ===== העברה בין שולחנות =====
+  function openMove(fromTableId, guestId) {
+    if (!requireEdit()) return;
+    const g = guestById(guestId);
+    if (!g) return;
+    moveCtx = { fromTableId, guestId };
+    const need = Math.max(1, g.people);
+
+    document.getElementById('moveTitle').textContent =
+      `העברת ${g.name}${need > 1 ? ` (${need} אנשים)` : ''} משולחן ${fromTableId}`;
+
+    const others = tables.filter(t => t.id !== fromTableId);
+    document.getElementById('moveList').innerHTML = others.map(t => {
+      const free = freeSeats(t);
+      const fits = free >= need;
+      return `<div class="modal-guest-item ${fits ? '' : 'item-full'}" onclick="moveTo(${t.id})">
+                <div class="modal-guest-name">שולחן ${t.id} ${fits ? '' : '— מלא'}</div>
+                <div class="modal-guest-meta">${occupancy(t)}/${seatsPerTable} תפוסים · ${fits ? free + ' פנויים' : 'לחץ כדי להחליף עם מישהו'}</div>
+              </div>`;
+    }).join('');
+    document.getElementById('moveModal').classList.add('open');
+  }
+  window.openMove = openMove;
+
+  function moveTo(toTableId) {
+    if (!moveCtx) return;
+    const g   = guestById(moveCtx.guestId);
+    const to  = tables.find(t => t.id === toTableId);
+    if (!g || !to) return;
+    const need = Math.max(1, g.people);
+
+    if (freeSeats(to) >= need) {
+      const from = tables.find(t => t.id === moveCtx.fromTableId);
+      if (from) from.guests = from.guests.filter(id => id !== g.id);
+      to.guests.push(g.id);
+      markManual(); saveArrangement(); renderAll();
+      closeModal('moveModal');
+      showToast(`✅ ${g.name} הועבר לשולחן ${toTableId}`);
+      moveCtx = null;
+      return;
+    }
+    openSwap(toTableId);
+  }
+  window.moveTo = moveTo;
+
+  // שולחן היעד מלא — מי יוצא?
+  function openSwap(toTableId) {
+    const g  = guestById(moveCtx.guestId);
+    const to = tables.find(t => t.id === toTableId);
+    const list = seatedOf(to);
+
+    document.getElementById('swapTitle').textContent = `שולחן ${toTableId} מלא — מי יוצא?`;
+    document.getElementById('swapSubtitle').textContent =
+      `${g.name} ייכנס לשולחן ${toTableId}, ומי שתבחר/י יעבור לשולחן ${moveCtx.fromTableId}`;
+
+    document.getElementById('swapList').innerHTML = list.map(o => `
+      <div class="modal-guest-item" onclick="doSwap(${toTableId}, '${o.id}')">
+        <div class="modal-guest-name">${o.name}${o.people > 1 ? ` (${o.people})` : ''}</div>
+        <div class="modal-guest-meta">${o.side} · ${o.category}</div>
+      </div>`).join('');
+
+    closeModal('moveModal');
+    document.getElementById('swapModal').classList.add('open');
+  }
+
+  function doSwap(toTableId, otherId) {
+    if (!requireEdit() || !moveCtx) return;
+    const from  = tables.find(t => t.id === moveCtx.fromTableId);
+    const to    = tables.find(t => t.id === toTableId);
+    const g     = guestById(moveCtx.guestId);
+    const other = guestById(otherId);
+    if (!from || !to || !g || !other) return;
+
+    const gP = Math.max(1, g.people), oP = Math.max(1, other.people);
+    const toAfter   = occupancy(to)   - oP + gP;
+    const fromAfter = occupancy(from) - gP + oP;
+
+    if (toAfter > seatsPerTable || fromAfter > seatsPerTable) {
+      const which = toAfter > seatsPerTable ? toTableId : moveCtx.fromTableId;
+      const cnt   = toAfter > seatsPerTable ? toAfter : fromAfter;
+      if (!confirm(`⚠️ אחרי ההחלפה יהיו ${cnt} אנשים בשולחן ${which} (הקיבולת ${seatsPerTable}).\nלהמשיך בכל זאת?`)) return;
+    }
+
+    from.guests = from.guests.filter(id => id !== g.id);
+    to.guests   = to.guests.filter(id => id !== other.id);
+    to.guests.push(g.id);
+    from.guests.push(other.id);
+
+    markManual(); saveArrangement(); renderAll();
+    closeModal('swapModal');
+    showToast(`⇄ ${g.name} ↔ ${other.name}`);
+    moveCtx = null;
+  }
+  window.doSwap = doSwap;
+
+  function moveToWaiting() {
+    if (!requireEdit() || !moveCtx) return;
+    const from = tables.find(t => t.id === moveCtx.fromTableId);
+    const g    = guestById(moveCtx.guestId);
+    if (from) from.guests = from.guests.filter(id => id !== moveCtx.guestId);
+    markManual(); saveArrangement(); renderAll();
+    closeModal('moveModal');
+    showToast(`${g ? g.name : 'המוזמן'} הועבר לרשימת הממתינים`);
+    moveCtx = null;
+  }
+  window.moveToWaiting = moveToWaiting;
+
+  // ===== הוספה לשולחן =====
+  function openAddGuest(tableId) {
+    if (!requireEdit()) return;
+    addingToTable = tableId;
+    document.getElementById('addGuestTitle').textContent = `הוסף מוזמן לשולחן ${tableId}`;
+    document.getElementById('addGuestSearch').value = '';
+    filterAddGuest();
+    document.getElementById('addGuestModal').classList.add('open');
+  }
+  window.openAddGuest = openAddGuest;
+
+  function filterAddGuest() {
+    const q = document.getElementById('addGuestSearch').value.trim();
+    const seated = seatedIdSet();
+    const t = tables.find(t => t.id === addingToTable);
+    const free = t ? freeSeats(t) : 0;
+
+    const list = allGuests.filter(g =>
+      !seated.has(g.id) && g.rsvp !== 'declined' && (!q || g.name.includes(q))
+    );
+
+    const el = document.getElementById('addGuestList');
+    if (!list.length) {
+      el.innerHTML = '<div style="text-align:center;color:rgba(253,246,255,0.3);padding:20px;">אין מוזמנים פנויים</div>';
+      return;
+    }
+    el.innerHTML = list.map(g => {
+      const need = Math.max(1, g.people);
+      const fits = need <= free;
+      return `<div class="modal-guest-item ${fits ? '' : 'item-full'}"
+                onclick="${fits ? `assignToTable(${addingToTable}, '${g.id}')` : `showToast('נותרו ${free} מקומות בלבד', true)`}">
+                <div class="modal-guest-name">${g.name}${need > 1 ? ` (${need})` : ''}</div>
+                <div class="modal-guest-meta">${g.side} · ${g.category} · ${g.rsvp === 'confirmed' ? 'אישר' : 'לא ענה'}</div>
+              </div>`;
+    }).join('');
+  }
+  window.filterAddGuest = filterAddGuest;
+
+  // ===== מודאלים =====
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+  window.closeModal = closeModal;
+
+  // ===== הדפסת רשימה אלפביתית =====
+  function printAlphabetical() {
+    const rows = [];
+    tables.forEach(t => seatedOf(t).forEach(g => rows.push({ name: g.name, table: t.id, people: g.people })));
+    if (!rows.length) { showToast('אין עדיין סידור להדפסה', true); return; }
+    rows.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+
+    const d = new Date();
+    const when = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    document.getElementById('printArea').innerHTML = `
+      <h1>סידור ישיבה — אמרי &amp; ליטל חמרי</h1>
+      <div class="print-sub">רשימה אלפביתית · הודפס ${when} · ${rows.length} רשומות</div>
+      <table>
+        <thead><tr><th style="width:60%">שם</th><th>אנשים</th><th>שולחן</th></tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr><td>${r.name}</td><td>${r.people}</td><td class="tnum">${r.table}</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+    window.print();
+  }
+  window.printAlphabetical = printAlphabetical;
+
+  // ===== ייצוא לאקסל =====
+  function exportExcel() {
+    const rows = [['שולחן', 'שם מלא', 'אנשים', 'צד', 'קטגוריה', 'סטטוס']];
+    const label = { confirmed: 'אישר', declined: 'לא מגיע', pending: 'לא ענה' };
+    tables.forEach(t => seatedOf(t).forEach(g =>
+      rows.push([t.id, g.name, g.people, g.side, g.category, label[g.rsvp]])));
+    const seated = seatedIdSet();
+    allGuests.filter(g => !seated.has(g.id)).forEach(g =>
+      rows.push(['לא משובץ', g.name, g.people, g.side, g.category, label[g.rsvp]]));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 10 }, { wch: 25 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'סידור שולחנות');
+    XLSX.writeFile(wb, 'סידור_שולחנות_חתונה_חמרי.xlsx');
+    showToast('📥 האקסל הורד!');
+  }
+  window.exportExcel = exportExcel;
+
+  // ===== ניווט והודעות =====
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function showToast(msg, isErr = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = 'toast' + (isErr ? ' err' : '');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+  window.showToast = showToast;
+
+  document.getElementById('loginName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginCode').focus();
+  });
+</script>
+</body>
+</html>
