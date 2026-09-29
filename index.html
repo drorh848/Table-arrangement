@@ -276,10 +276,11 @@
         <input type="checkbox" id="optPending" onchange="togglePending(this.checked)" />
         סידור אוטומטי כולל מי שלא ענה (נספר כאדם אחד)
       </label>
+      <div class="filter-note" style="margin-top:10px;">💾 הסידור נשמר במכשיר הזה בלבד. המוזמנים ואישורי ההגעה מתעדכנים מהאפליקציה הראשית.</div>
     </div>
 
     <div class="view-only-banner" id="viewOnlyBanner" style="display:none;">
-      👁️ צפייה בלבד — הסידור מתעדכן בזמן אמת. רק דרור וליטל יכולים לערוך.
+      👁️ צפייה בלבד — רק דרור וליטל יכולים לערוך.
     </div>
 
     <!-- Stats -->
@@ -445,14 +446,13 @@
   let moveCtx      = null;
   let backupsList  = [];
   let listenersOn  = false;
-  let applyingRemote = false;
   let rsvpById = {}, rsvpByPhone = {};
 
-  // סינון צדדים: נשמר ב-Firebase בתוך seating/filters לכל משתמש עורך בנפרד
-  let sideFilters = {};   // { dror:[...], lital:[...] }
+  // הסידור, הגיבויים וההגדרות נשמרים מקומית במכשיר (localStorage), לכל משתמש בנפרד.
+  // מפיירבס רק קוראים את רשימת המוזמנים ואת אישורי ההגעה.
+  const LS_PREFIX = 'hamri_wedding_seating_v1_';
+  const DEFAULT_SIDES = { dror: ['dror','bracha'], lital: ['lital'] };
   let mySides     = [];   // ריק = כל הצדדים
-  // אפשרויות לכל משתמש עורך (נשמר ב-seating/options)
-  let userOptions = {};   // { dror:{ includePending:true } }
   let includePending = false;
 
   // ===== עזר =====
@@ -494,8 +494,7 @@
     document.querySelectorAll('.editor-only').forEach(el => {
       el.style.display = canEdit ? '' : 'none';
     });
-    mySides = canEdit ? normSides(sideFilters[userKey()]) : [];
-    includePending = canEdit ? readIncludePending() : false;
+    loadLocal();
     showPage('page-main');
     renderAll();
     loadData();
@@ -542,23 +541,14 @@
   window.setAllSides = setAllSides;
 
   function persistFilter() {
-    if (canEdit && userKey()) {
-      sideFilters = { ...sideFilters, [userKey()]: mySides };
-      saveArrangement();
-    }
+    saveArrangement();
     renderAll();
   }
 
   // ===== כולל מי שלא ענה =====
-  function readIncludePending() {
-    const o = userOptions[userKey()];
-    return !!(o && o.includePending);
-  }
-
   function togglePending(on) {
     if (!requireEdit()) return;
     includePending = !!on;
-    userOptions = { ...userOptions, [userKey()]: { includePending } };
     saveArrangement();
     showToast(includePending
       ? 'סידור אוטומטי ישבץ גם מי שלא ענה (כאדם אחד)'
@@ -637,45 +627,6 @@
       applyRsvp();
       renderAll();
     });
-
-    window._onValue(window._ref(window._db, 'seating'), (snap) => {
-      const data = snap.val();
-      applyingRemote = true;
-      if (data) {
-        numTables     = data.numTables     || 10;
-        seatsPerTable = data.seatsPerTable || 10;
-        manualEdits   = !!data.manual;
-        const rawTables = Array.isArray(data.tables) ? data.tables : Object.values(data.tables || {});
-        tables = rawTables.filter(Boolean).map(t => ({
-          id: t.id,
-          guests: Array.isArray(t.guests) ? t.guests.filter(Boolean) : Object.values(t.guests || {}),
-          label: t.label || ''
-        }));
-        while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
-        sideFilters = data.filters || {};
-        userOptions = data.options || {};
-      } else {
-        tables = [];
-        for (let i = 1; i <= numTables; i++) tables.push({ id: i, guests: [], label: '' });
-        sideFilters = {};
-        userOptions = {};
-      }
-      if (canEdit && currentUser) {
-        mySides = normSides(sideFilters[userKey()]);
-        includePending = readIncludePending();
-      }
-      document.getElementById('valTables').textContent = numTables;
-      document.getElementById('valSeats').textContent  = seatsPerTable;
-      applyingRemote = false;
-      renderAll();
-    });
-
-    window._onValue(window._ref(window._db, 'seating_backups'), (snap) => {
-      const data = snap.val() || {};
-      backupsList = Object.entries(data)
-        .map(([k, v]) => ({ key: k, ts: v.ts || 0, label: v.label || '', seated: v.seated || 0 }))
-        .sort((a, b) => b.ts - a.ts);
-    });
   }
 
   function localPhone(raw) {
@@ -722,54 +673,86 @@
     });
   }
 
-  // ===== שמירה =====
+  // ===== שמירה מקומית =====
   function markManual() { manualEdits = true; }
 
-  // מחזירה true אם נשמר בהצלחה
-  async function saveArrangement() {
-    if (!window._firebaseReady || applyingRemote || !canEdit) return false;
+  function lsKey(name) { return LS_PREFIX + (userKey() || 'guest') + '_' + name; }
+
+  function lsRead(name, fallback) {
     try {
-      await window._set(window._ref(window._db, 'seating'), {
-        numTables, seatsPerTable, manual: manualEdits,
-        tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })),
-        filters: sideFilters,
-        options: userOptions,
-        updatedBy: currentUser || '', updatedAt: Date.now()
-      });
+      const raw = localStorage.getItem(lsKey(name));
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) { return fallback; }
+  }
+
+  function lsWrite(name, value) {
+    try {
+      localStorage.setItem(lsKey(name), JSON.stringify(value));
       return true;
     } catch (e) {
-      console.error('saveArrangement', e);
-      showToast('❌ השמירה נכשלה — השינוי לא נשמר. בדוק חיבור ונסה שוב', true);
+      console.error('localStorage', e);
+      showToast('❌ השמירה במכשיר נכשלה (' + (e.name || 'שגיאה') + '). אולי הדפדפן במצב גלישה בסתר?', true);
       return false;
     }
   }
 
-  // ===== גיבוי ושחזור =====
+  function snapshotData() {
+    return {
+      numTables, seatsPerTable, manual: manualEdits,
+      tables: tables.map(t => ({ id: t.id, guests: [...t.guests], label: t.label || '' }))
+    };
+  }
+
+  function applyData(d) {
+    numTables     = d.numTables     || 10;
+    seatsPerTable = d.seatsPerTable || 10;
+    manualEdits   = !!d.manual;
+    tables = (Array.isArray(d.tables) ? d.tables : []).filter(Boolean).map(t => ({
+      id: t.id,
+      guests: Array.isArray(t.guests) ? t.guests.filter(Boolean) : [],
+      label: t.label || ''
+    }));
+    while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
+    document.getElementById('valTables').textContent = numTables;
+    document.getElementById('valSeats').textContent  = seatsPerTable;
+  }
+
+  // טעינה בכניסה
+  function loadLocal() {
+    const saved = lsRead('state', null);
+    if (saved) {
+      applyData(saved);
+      mySides        = normSides(saved.sides);
+      includePending = !!saved.includePending;
+    } else {
+      applyData({ numTables: 10, seatsPerTable: 10, manual: false, tables: [] });
+      mySides        = normSides(DEFAULT_SIDES[userKey()] || []);
+      includePending = false;
+    }
+    backupsList = lsRead('backups', []);
+    if (!Array.isArray(backupsList)) backupsList = [];
+  }
+
+  // מחזירה true אם נשמר בהצלחה
+  async function saveArrangement() {
+    if (!canEdit) return false;
+    return lsWrite('state', {
+      ...snapshotData(),
+      sides: mySides,
+      includePending,
+      updatedAt: Date.now()
+    });
+  }
+
+  // ===== גיבוי ושחזור (מקומי) =====
   // מחזירה true אם הגיבוי נשמר
   async function makeBackup(label) {
-    if (!window._firebaseReady) return false;
-    try {
-      const seated = tables.reduce((s, t) => s + occupancy(t), 0);
-      const key = 'b' + Date.now();
-      await window._set(window._ref(window._db, 'seating_backups/' + key), {
-        ts: Date.now(), label: (label || '') + (currentUser ? ` (${currentUser})` : ''), seated,
-        data: { numTables, seatsPerTable, manual: manualEdits,
-                tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })) }
-      });
-      const snap = await window._get(window._ref(window._db, 'seating_backups'));
-      const all  = snap.exists() ? snap.val() : {};
-      const keys = Object.entries(all)
-        .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
-        .map(e => e[0]);
-      for (const old of keys.slice(MAX_BACKUPS)) {
-        await window._set(window._ref(window._db, 'seating_backups/' + old), null);
-      }
-      return true;
-    } catch (e) {
-      console.error('makeBackup', e);
-      showToast('❌ לא הצלחתי לשמור גיבוי — הפעולה בוטלה. בדוק חיבור ונסה שוב', true);
-      return false;
-    }
+    const seated = tables.reduce((s, t) => s + occupancy(t), 0);
+    const entry = { key: 'b' + Date.now(), ts: Date.now(), label: label || '', seated, data: snapshotData() };
+    const next = [entry, ...backupsList].slice(0, MAX_BACKUPS);
+    if (!lsWrite('backups', next)) return false;
+    backupsList = next;
+    return true;
   }
 
   function openBackups() {
@@ -792,18 +775,12 @@
 
   async function restoreBackup(key) {
     if (!requireEdit()) return;
-    if (!confirm('לשחזר את הגיבוי הזה?\nהסידור הנוכחי של כל הצדדים יוחלף (וייגבה קודם).')) return;
+    const b = backupsList.find(x => x.key === key);
+    if (!b) { showToast('הגיבוי לא נמצא', true); return; }
+    if (!confirm('לשחזר את הגיבוי הזה?\nהסידור הנוכחי יוחלף (וייגבה קודם).')) return;
+    const data = JSON.parse(JSON.stringify(b.data || {}));
     if (!(await makeBackup('לפני שחזור'))) return;
-    const snap = await window._get(window._ref(window._db, 'seating_backups/' + key));
-    if (!snap.exists()) { showToast('הגיבוי לא נמצא', true); return; }
-    const d = snap.val().data || {};
-    numTables     = d.numTables     || numTables;
-    seatsPerTable = d.seatsPerTable || seatsPerTable;
-    manualEdits   = !!d.manual;
-    tables = (d.tables || []).map(t => ({ id: t.id, guests: t.guests || [], label: t.label || '' }));
-    while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
-    document.getElementById('valTables').textContent = numTables;
-    document.getElementById('valSeats').textContent  = seatsPerTable;
+    applyData(data);
     const ok = await saveArrangement();
     renderAll();
     closeModal('backupModal');
@@ -1249,45 +1226,47 @@
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
   window.closeModal = closeModal;
 
-  // ===== הדפסת רשימה אלפביתית (כל האולם, בלי מי שלא מגיע) =====
+  // ===== הדפסת רשימה אלפביתית (הצדדים המסוננים, בלי מי שלא מגיע) =====
   function printAlphabetical() {
     const rows = [];
     tables.forEach(t => seatedOf(t)
-      .filter(g => g.rsvp !== 'declined')
-      .forEach(g => rows.push({ name: g.name, table: t.id, people: Math.max(1, g.people) })));
+      .filter(g => inFilter(g) && g.rsvp !== 'declined')
+      .forEach(g => rows.push({ name: g.name, table: t.id, label: t.label || '', people: Math.max(1, g.people) })));
     if (!rows.length) { showToast('אין עדיין סידור להדפסה', true); return; }
     rows.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    const people = rows.reduce((s, r) => s + r.people, 0);
 
     const d = new Date();
     const when = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
     document.getElementById('printArea').innerHTML = `
       <h1>סידור ישיבה — אמרי &amp; ליטל חמרי</h1>
-      <div class="print-sub">רשימה אלפביתית · הודפס ${when} · ${rows.length} רשומות</div>
+      <div class="print-sub">${escHtml(sidesText())} · רשימה אלפביתית · הודפס ${when} · ${rows.length} רשומות · ${people} אנשים</div>
       <table>
-        <thead><tr><th style="width:60%">שם</th><th>אנשים</th><th>שולחן</th></tr></thead>
+        <thead><tr><th style="width:45%">שם</th><th>אנשים</th><th>שולחן</th><th>שם שולחן</th></tr></thead>
         <tbody>
-          ${rows.map(r => `<tr><td>${escHtml(r.name)}</td><td>${r.people}</td><td class="tnum">${r.table}</td></tr>`).join('')}
+          ${rows.map(r => `<tr><td>${escHtml(r.name)}</td><td>${r.people}</td><td class="tnum">${r.table}</td><td>${escHtml(r.label)}</td></tr>`).join('')}
         </tbody>
       </table>`;
     window.print();
   }
   window.printAlphabetical = printAlphabetical;
 
-  // ===== ייצוא לאקסל (כל האולם) =====
+  // ===== ייצוא לאקסל (הצדדים המסוננים) =====
   function exportExcel() {
     const rows = [['שולחן', 'שם שולחן', 'שם מלא', 'אנשים', 'צד', 'קטגוריה', 'סטטוס']];
     const label = { confirmed: 'אישר', declined: 'לא מגיע', pending: 'לא ענה' };
-    tables.forEach(t => seatedOf(t).forEach(g =>
+    tables.forEach(t => seatedOf(t).filter(inFilter).forEach(g =>
       rows.push([t.id, t.label || '', g.name, g.people, g.side, g.category, label[g.rsvp]])));
     const seated = seatedIdSet();
-    allGuests.filter(g => !seated.has(g.id)).forEach(g =>
+    allGuests.filter(g => inFilter(g) && !seated.has(g.id)).forEach(g =>
       rows.push(['לא משובץ', '', g.name, g.people, g.side, g.category, label[g.rsvp]]));
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!cols'] = [{ wch: 10 }, { wch: 18 }, { wch: 25 }, { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, ws, 'סידור שולחנות');
-    XLSX.writeFile(wb, 'סידור_שולחנות_חתונה_חמרי.xlsx');
+    const suffix = isFiltered() ? '_' + mySides.map(k => KEY_TO_NAME[k]).join('_') : '';
+    XLSX.writeFile(wb, `סידור_שולחנות_חתונה_חמרי${suffix}.xlsx`);
     showToast('📥 האקסל הורד!');
   }
   window.exportExcel = exportExcel;
