@@ -148,7 +148,10 @@
   .modal-guest-meta { font-size:11px; color:rgba(253,246,255,0.35); margin-top:2px; }
 
   /* TOAST */
-  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--success); color:white; padding:12px 24px; border-radius:4px; font-size:14px; z-index:100; transition:transform 0.3s; white-space:nowrap; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--success); color:white; padding:12px 24px; border-radius:4px; font-size:14px; z-index:100; transition:transform 0.3s; white-space:normal; width:max-content; max-width:90vw; text-align:center; line-height:1.5; }
+  .pending-opt { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px;
+    font-size:12px; color:rgba(253,246,255,0.7); cursor:pointer; }
+  .pending-opt input { width:18px; height:18px; accent-color:var(--gold); cursor:pointer; }
   .toast.show { transform:translateX(-50%) translateY(0); }
   .toast.err { background:var(--danger); }
 
@@ -269,6 +272,10 @@
       <div class="settings-title">👥 צדדים לסידור</div>
       <div class="side-filter" id="sideFilter"></div>
       <div class="filter-note" id="filterNote"></div>
+      <label class="pending-opt editor-only">
+        <input type="checkbox" id="optPending" onchange="togglePending(this.checked)" />
+        סידור אוטומטי כולל מי שלא ענה (נספר כאדם אחד)
+      </label>
     </div>
 
     <div class="view-only-banner" id="viewOnlyBanner" style="display:none;">
@@ -444,6 +451,9 @@
   // סינון צדדים: נשמר ב-Firebase בתוך seating/filters לכל משתמש עורך בנפרד
   let sideFilters = {};   // { dror:[...], lital:[...] }
   let mySides     = [];   // ריק = כל הצדדים
+  // אפשרויות לכל משתמש עורך (נשמר ב-seating/options)
+  let userOptions = {};   // { dror:{ includePending:true } }
+  let includePending = false;
 
   // ===== עזר =====
   function escHtml(s) {
@@ -485,6 +495,7 @@
       el.style.display = canEdit ? '' : 'none';
     });
     mySides = canEdit ? normSides(sideFilters[userKey()]) : [];
+    includePending = canEdit ? readIncludePending() : false;
     showPage('page-main');
     renderAll();
     loadData();
@@ -515,6 +526,8 @@
     document.getElementById('filterNote').textContent = all
       ? 'מוצגים כל הצדדים. בחר/י צדדים כדי לסדר רק אותם.'
       : `מסונן ל: ${sidesText()} — ממתינים, סטטיסטיקה, סידור אוטומטי ואיפוס יחולו רק עליהם. שולחנות של צדדים אחרים לא ייפגעו.`;
+    const cb = document.getElementById('optPending');
+    if (cb) cb.checked = includePending;
   }
 
   function toggleSide(k) {
@@ -535,6 +548,23 @@
     }
     renderAll();
   }
+
+  // ===== כולל מי שלא ענה =====
+  function readIncludePending() {
+    const o = userOptions[userKey()];
+    return !!(o && o.includePending);
+  }
+
+  function togglePending(on) {
+    if (!requireEdit()) return;
+    includePending = !!on;
+    userOptions = { ...userOptions, [userKey()]: { includePending } };
+    saveArrangement();
+    showToast(includePending
+      ? 'סידור אוטומטי ישבץ גם מי שלא ענה (כאדם אחד)'
+      : 'סידור אוטומטי ישבץ רק מי שאישר הגעה');
+  }
+  window.togglePending = togglePending;
 
   // ===== SETTINGS =====
   function changeSetting(type, delta) {
@@ -623,12 +653,17 @@
         }));
         while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
         sideFilters = data.filters || {};
+        userOptions = data.options || {};
       } else {
         tables = [];
         for (let i = 1; i <= numTables; i++) tables.push({ id: i, guests: [], label: '' });
         sideFilters = {};
+        userOptions = {};
       }
-      if (canEdit && currentUser) mySides = normSides(sideFilters[userKey()]);
+      if (canEdit && currentUser) {
+        mySides = normSides(sideFilters[userKey()]);
+        includePending = readIncludePending();
+      }
       document.getElementById('valTables').textContent = numTables;
       document.getElementById('valSeats').textContent  = seatsPerTable;
       applyingRemote = false;
@@ -690,37 +725,50 @@
   // ===== שמירה =====
   function markManual() { manualEdits = true; }
 
+  // מחזירה true אם נשמר בהצלחה
   async function saveArrangement() {
-    if (!window._firebaseReady || applyingRemote || !canEdit) return;
+    if (!window._firebaseReady || applyingRemote || !canEdit) return false;
     try {
       await window._set(window._ref(window._db, 'seating'), {
         numTables, seatsPerTable, manual: manualEdits,
         tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })),
         filters: sideFilters,
+        options: userOptions,
         updatedBy: currentUser || '', updatedAt: Date.now()
       });
+      return true;
     } catch (e) {
-      showToast('שגיאה בשמירה — בדוק חיבור', true);
+      console.error('saveArrangement', e);
+      showToast('❌ השמירה נכשלה — השינוי לא נשמר. בדוק חיבור ונסה שוב', true);
+      return false;
     }
   }
 
   // ===== גיבוי ושחזור =====
+  // מחזירה true אם הגיבוי נשמר
   async function makeBackup(label) {
-    if (!window._firebaseReady) return;
-    const seated = tables.reduce((s, t) => s + occupancy(t), 0);
-    const key = 'b' + Date.now();
-    await window._set(window._ref(window._db, 'seating_backups/' + key), {
-      ts: Date.now(), label: (label || '') + (currentUser ? ` (${currentUser})` : ''), seated,
-      data: { numTables, seatsPerTable, manual: manualEdits,
-              tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })) }
-    });
-    const snap = await window._get(window._ref(window._db, 'seating_backups'));
-    const all  = snap.exists() ? snap.val() : {};
-    const keys = Object.entries(all)
-      .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
-      .map(e => e[0]);
-    for (const old of keys.slice(MAX_BACKUPS)) {
-      await window._set(window._ref(window._db, 'seating_backups/' + old), null);
+    if (!window._firebaseReady) return false;
+    try {
+      const seated = tables.reduce((s, t) => s + occupancy(t), 0);
+      const key = 'b' + Date.now();
+      await window._set(window._ref(window._db, 'seating_backups/' + key), {
+        ts: Date.now(), label: (label || '') + (currentUser ? ` (${currentUser})` : ''), seated,
+        data: { numTables, seatsPerTable, manual: manualEdits,
+                tables: tables.map(t => ({ id: t.id, guests: t.guests, label: t.label || '' })) }
+      });
+      const snap = await window._get(window._ref(window._db, 'seating_backups'));
+      const all  = snap.exists() ? snap.val() : {};
+      const keys = Object.entries(all)
+        .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
+        .map(e => e[0]);
+      for (const old of keys.slice(MAX_BACKUPS)) {
+        await window._set(window._ref(window._db, 'seating_backups/' + old), null);
+      }
+      return true;
+    } catch (e) {
+      console.error('makeBackup', e);
+      showToast('❌ לא הצלחתי לשמור גיבוי — הפעולה בוטלה. בדוק חיבור ונסה שוב', true);
+      return false;
     }
   }
 
@@ -745,7 +793,7 @@
   async function restoreBackup(key) {
     if (!requireEdit()) return;
     if (!confirm('לשחזר את הגיבוי הזה?\nהסידור הנוכחי של כל הצדדים יוחלף (וייגבה קודם).')) return;
-    await makeBackup('לפני שחזור');
+    if (!(await makeBackup('לפני שחזור'))) return;
     const snap = await window._get(window._ref(window._db, 'seating_backups/' + key));
     if (!snap.exists()) { showToast('הגיבוי לא נמצא', true); return; }
     const d = snap.val().data || {};
@@ -756,21 +804,26 @@
     while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
     document.getElementById('valTables').textContent = numTables;
     document.getElementById('valSeats').textContent  = seatsPerTable;
-    await saveArrangement();
+    const ok = await saveArrangement();
     renderAll();
     closeModal('backupModal');
-    showToast('↩️ הסידור שוחזר');
+    if (ok) showToast('↩️ הסידור שוחזר');
   }
   window.restoreBackup = restoreBackup;
 
   // ===== סידור אוטומטי =====
-  // רק מי שאישר הגעה ובצדדים המסוננים. שולחנות של צדדים אחרים לא נוגעים.
+  // מי שאישר הגעה (ואם סומן — גם מי שלא ענה), רק בצדדים המסוננים. שולחנות של צדדים אחרים לא נוגעים.
   async function autoArrange() {
     if (!requireEdit()) return;
 
-    const confirmed = allGuests.filter(g => g.rsvp === 'confirmed' && inFilter(g));
+    const confirmedList = allGuests.filter(g => inFilter(g) && g.rsvp === 'confirmed');
+    const pendingList   = allGuests.filter(g => inFilter(g) && g.rsvp === 'pending');
+    const confirmed = includePending ? confirmedList.concat(pendingList) : confirmedList;
+
     if (confirmed.length === 0) {
-      showToast(`אין מוזמנים שאישרו הגעה (${sidesText()})`, true);
+      showToast(pendingList.length
+        ? `אף אחד (${sidesText()}) עוד לא אישר הגעה — ${pendingList.length} לא ענו. סמן "כולל מי שלא ענה" כדי לשבץ אותם`
+        : `אין מוזמנים לשיבוץ (${sidesText()})`, true);
       return;
     }
 
@@ -784,7 +837,7 @@
       if (!confirm(`לבצע סידור אוטומטי ${scope}?\nהסידור הנוכחי ייגבה קודם.`)) return;
     }
 
-    await makeBackup('לפני סידור אוטומטי');
+    if (!(await makeBackup('לפני סידור אוטומטי'))) return;
 
     // קבוצות: צד × קטגוריה
     const groups = [];
@@ -827,9 +880,18 @@
     document.getElementById('valTables').textContent = numTables;
 
     if (!isFiltered()) manualEdits = false;
-    await saveArrangement();
+    const ok = await saveArrangement();
     renderAll();
-    showToast(`✨ סודרו ${planned.length} שולחנות`);
+    if (!ok) return;   // הודעת השגיאה כבר הוצגה
+
+    const people = confirmed.reduce((s, g) => s + Math.max(1, g.people), 0);
+    let msg = `✨ ${sidesText()}: סודרו ${planned.length} שולחנות · ${people} אנשים`;
+    if (!includePending && pendingList.length) {
+      msg += ` · ${pendingList.length} שלא ענו לא שובצו (נשארו בממתינים)`;
+    } else if (includePending && pendingList.length) {
+      msg += ` · מתוכם ${pendingList.length} שלא ענו נספרו כאדם אחד`;
+    }
+    showToast(msg, false, 6000);
   }
   window.autoArrange = autoArrange;
 
@@ -841,7 +903,7 @@
 
     const pwd = prompt(`⚠️ יוצאו מהשולחנות ${mine} רשומות של ${sidesText()}.\nגיבוי יישמר אוטומטית.\n\nהקלד סיסמה כדי להמשיך:`);
     if (pwd !== RESET_PASSWORD) { if (pwd !== null) showToast('סיסמה שגויה', true); return; }
-    await makeBackup('לפני איפוס');
+    if (!(await makeBackup('לפני איפוס'))) return;
 
     if (isFiltered()) {
       clearFilteredFromTables();
@@ -849,9 +911,9 @@
       tables = newTables(numTables);
       manualEdits = false;
     }
-    await saveArrangement();
+    const ok = await saveArrangement();
     renderAll();
-    showToast('🔄 אופס');
+    if (ok) showToast(`🔄 אופס (${sidesText()})`);
   }
   window.resetArrangement = resetArrangement;
 
@@ -1237,12 +1299,14 @@
     window.scrollTo(0, 0);
   }
 
-  function showToast(msg, isErr = false) {
+  let toastTimer = null;
+  function showToast(msg, isErr = false, ms) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className   = 'toast' + (isErr ? ' err' : '');
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2500);
+    clearTimeout(toastTimer);   // הודעה חדשה לא תיעלם בגלל טיימר של הודעה קודמת
+    toastTimer = setTimeout(() => t.classList.remove('show'), ms || (msg.length > 40 ? 5000 : 2500));
   }
   window.showToast = showToast;
 </script>
