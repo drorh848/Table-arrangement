@@ -325,6 +325,7 @@
     <div class="tables-grid" id="tablesGrid"></div>
 
     <div class="gold-line"></div>
+    <button class="btn btn-gold" id="shareBtn" onclick="shareTablesPdf()" style="margin-bottom:10px;">📤 שיתוף / הדפסה — רשימת שולחנות</button>
     <button class="btn btn-outline" onclick="printAlphabetical()" style="margin-bottom:10px;">🖨️ הדפסת רשימה אלפביתית</button>
     <button class="btn btn-outline" onclick="openBackups()" style="margin-bottom:10px;">💾 גיבויים ושחזור</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="margin-bottom:10px;">📥 ייצוא לאקסל</button>
@@ -390,6 +391,7 @@
 <div id="printArea"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1225,6 +1227,229 @@
   // ===== מודאלים =====
   function closeModal(id) { document.getElementById(id).classList.remove('open'); }
   window.closeModal = closeModal;
+
+  // ===== שיתוף / הדפסה: רשימת שולחנות כ-PDF דרך חלון השיתוף של הטלפון =====
+  // העמודים מצוירים על canvas (כך העברית תמיד נכונה) ונארזים ל-PDF.
+  const PDF_W = 1240, PDF_H = 1754;               // A4 ב-150dpi
+  const PDF_FONT = '"Noto Serif Hebrew", Arial, sans-serif';
+  let sharing = false;
+
+  function fitText(ctx, text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+    return s + '…';
+  }
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  // מבנה בלוק שולחן
+  const BLK = { pad: 18, headH: 52, labelH: 36, sepH: 12, lineH: 38, bottom: 14 };
+  const PDF_COLW = (PDF_W - 60 * 2 - 30) / 2;
+
+  // שם ארוך יורד לשורה הבאה — לא נחתך, כדי שליטל תוכל להקליד אותו במלואו
+  function wrapWords(ctx, text, maxW) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines = []; let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (!cur || ctx.measureText(test).width <= maxW) cur = test;
+      else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    return lines.map(l => fitText(ctx, l, maxW));   // מילה בודדת ארוכה מאוד — רק אז נחתך
+  }
+
+  function prepareBlock(mctx, b) {
+    mctx.font = `24px ${PDF_FONT}`;
+    b.rows = b.list.map(g => {
+      const cnt = g.rsvp === 'pending' ? 'לא ענה' : (g.people > 1 ? `(${g.people})` : '');
+      const cntW = cnt ? mctx.measureText(cnt).width + 14 : 0;
+      mctx.font = `26px ${PDF_FONT}`;
+      const lines = wrapWords(mctx, '• ' + g.name, PDF_COLW - BLK.pad * 2 - cntW);
+      mctx.font = `24px ${PDF_FONT}`;
+      return { g, cnt, lines };
+    });
+  }
+
+  function blockHeight(b) {
+    const lineCount = b.rows.reduce((s, r) => s + r.lines.length, 0);
+    return BLK.pad + BLK.headH + (b.t.label ? BLK.labelH : 0) + BLK.sepH + lineCount * BLK.lineH + BLK.bottom;
+  }
+
+  function drawBlock(ctx, b, x, y, w, h) {
+    // מסגרת
+    roundRectPath(ctx, x, y, w, h, 14);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#888'; ctx.stroke();
+    // פס כותרת
+    const headBottom = y + BLK.pad + BLK.headH + (b.t.label ? BLK.labelH : 0);
+    ctx.save();
+    roundRectPath(ctx, x, y, w, h, 14); ctx.clip();
+    ctx.fillStyle = '#efe6f7'; ctx.fillRect(x, y, w, headBottom - y + 4);
+    ctx.restore();
+    roundRectPath(ctx, x, y, w, h, 14); ctx.lineWidth = 2; ctx.strokeStyle = '#888'; ctx.stroke();
+
+    const right = x + w - BLK.pad, left = x + BLK.pad;
+    let cy = y + BLK.pad + 36;
+
+    // מספר שולחן (ימין) + מספר אנשים (שמאל)
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.fillStyle = '#000';
+    ctx.font = `bold 38px ${PDF_FONT}`;
+    ctx.fillText(`שולחן ${b.t.id}`, right, cy);
+    ctx.textAlign = 'left'; ctx.font = `24px ${PDF_FONT}`; ctx.fillStyle = '#555';
+    ctx.fillText(`${b.people} אנשים`, left, cy);
+
+    // הכותרת/נושא
+    if (b.t.label) {
+      cy += BLK.labelH;
+      ctx.textAlign = 'right'; ctx.fillStyle = '#4a0080'; ctx.font = `bold 28px ${PDF_FONT}`;
+      ctx.fillText(fitText(ctx, b.t.label, w - BLK.pad * 2), right, cy);
+    }
+
+    // קו מפריד
+    const sepY = headBottom + 4;
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(left, sepY); ctx.lineTo(right, sepY); ctx.stroke();
+
+    // רשימת היושבים
+    cy = sepY + BLK.sepH + 22;
+    for (const r of b.rows) {
+      if (r.cnt) {
+        ctx.textAlign = 'left'; ctx.font = `24px ${PDF_FONT}`;
+        ctx.fillStyle = r.g.rsvp === 'pending' ? '#999' : '#444';
+        ctx.fillText(r.cnt, left, cy);
+      }
+      ctx.textAlign = 'right'; ctx.fillStyle = '#000'; ctx.font = `26px ${PDF_FONT}`;
+      r.lines.forEach((line, i) => {
+        ctx.fillText(i === 0 ? line : '   ' + line, right, cy);
+        cy += BLK.lineH;
+      });
+    }
+  }
+
+  function renderTablePages(blocks, totalPeople) {
+    const M = 60, GAP = 30, COLW = PDF_COLW;
+    const FOOT = 50;
+    const colX = col => col === 0 ? PDF_W - M - COLW : M;   // עמודה ראשונה מימין
+    const d = new Date();
+    const when = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+
+    const pages = [];
+    let ctx, col, y, top;
+
+    function newPage() {
+      const c = document.createElement('canvas');
+      c.width = PDF_W; c.height = PDF_H;
+      ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PDF_W, PDF_H);
+      ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.fillStyle = '#000';
+      if (pages.length === 0) {
+        ctx.font = `bold 44px ${PDF_FONT}`;
+        ctx.fillText('סידור שולחנות — אמרי & ליטל חמרי', PDF_W / 2, M + 40);
+        ctx.font = `26px ${PDF_FONT}`; ctx.fillStyle = '#444';
+        ctx.fillText(`${sidesText()} · ${blocks.length} שולחנות · ${totalPeople} אנשים · ${when}`, PDF_W / 2, M + 88);
+        top = M + 125;
+      } else {
+        ctx.font = `24px ${PDF_FONT}`; ctx.fillStyle = '#666';
+        ctx.fillText(`סידור שולחנות — ${sidesText()} (המשך)`, PDF_W / 2, M + 20);
+        top = M + 45;
+      }
+      pages.push(c);
+      col = 0; y = top;
+    }
+
+    newPage();
+    for (const b of blocks) {
+      const h = blockHeight(b);
+      if (y + h > PDF_H - M - FOOT && y > top) {
+        if (col === 0) { col = 1; y = top; }
+        else newPage();
+      }
+      drawBlock(ctx, b, colX(col), y, COLW, h);
+      y += h + GAP;
+    }
+
+    // מספרי עמודים
+    pages.forEach((c, i) => {
+      const x = c.getContext('2d');
+      x.direction = 'rtl'; x.textAlign = 'center'; x.fillStyle = '#888';
+      x.font = `22px ${PDF_FONT}`;
+      x.fillText(`עמוד ${i + 1} מתוך ${pages.length}`, PDF_W / 2, PDF_H - M / 2);
+    });
+    return pages;
+  }
+
+  function downloadBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  async function shareTablesPdf() {
+    if (sharing) return;
+    const blocks = tables.map(t => {
+      const list = seatedOf(t).filter(g => inFilter(g) && g.rsvp !== 'declined');
+      return { t, list, people: list.reduce((s, g) => s + Math.max(1, g.people), 0) };
+    }).filter(b => b.list.length);
+
+    if (!blocks.length) { showToast(`אין שולחנות משובצים (${sidesText()})`, true); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { showToast('רכיב ה-PDF לא נטען — בדוק חיבור לאינטרנט ורענן', true); return; }
+
+    sharing = true;
+    const btn = document.getElementById('shareBtn');
+    const oldText = btn.textContent;
+    btn.textContent = '⏳ מכין קובץ...';
+    try {
+      try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+
+      const totalPeople = blocks.reduce((s, b) => s + b.people, 0);
+      const mctx = document.createElement('canvas').getContext('2d');
+      mctx.direction = 'rtl';
+      blocks.forEach(b => prepareBlock(mctx, b));
+      const pages = renderTablePages(blocks, totalPeople);
+      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+      pages.forEach((c, i) => {
+        if (i) pdf.addPage();
+        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+      });
+      const blob  = pdf.output('blob');
+      const sides = isFiltered() ? mySides.map(k => KEY_TO_NAME[k]).join('_') : 'כל_הצדדים';
+      const fname = `שולחנות_${sides}.pdf`;
+      const file  = new File([blob], fname, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `סידור שולחנות — ${sidesText()}` });
+        } catch (e) {
+          if (e.name !== 'AbortError') {       // AbortError = המשתמש סגר את חלון השיתוף
+            downloadBlob(blob, fname);
+            showToast('השיתוף לא הצליח — הקובץ ירד להורדות', true);
+          }
+        }
+      } else {
+        downloadBlob(blob, fname);
+        showToast('📥 הדפדפן לא תומך בשיתוף — הקובץ ירד להורדות');
+      }
+    } catch (e) {
+      console.error('shareTablesPdf', e);
+      showToast('❌ יצירת הקובץ נכשלה: ' + (e.message || e.name || 'שגיאה'), true);
+    } finally {
+      btn.textContent = oldText;
+      sharing = false;
+    }
+  }
+  window.shareTablesPdf = shareTablesPdf;
 
   // ===== הדפסת רשימה אלפביתית (הצדדים המסוננים, בלי מי שלא מגיע) =====
   function printAlphabetical() {
