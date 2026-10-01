@@ -176,6 +176,10 @@
   .chip-no   { border-color:rgba(231,76,60,0.4) !important; color:#f1948a !important;
                cursor:default !important; }
   .item-full { opacity:0.45; }
+  .table-split-btn { background:none; border:none; font-size:14px; cursor:pointer; padding:0 3px; }
+  .part-row { border-right:2px solid rgba(201,150,58,0.45); }
+  .part-mark { color:var(--gold); opacity:.8; }
+  .version-tag { text-align:center; font-size:11px; color:rgba(253,246,255,0.25); margin-top:10px; letter-spacing:1px; }
   .table-move-btn { background:none; border:none; color:var(--purple-light); font-size:15px;
     cursor:pointer; padding:0 4px; }
   .declined-box { background:rgba(231,76,60,0.07); border:1px solid rgba(231,76,60,0.25);
@@ -232,6 +236,7 @@
       </div>
       <button class="btn btn-gold" onclick="doLogin()">כניסה ←</button>
     </div>
+    <div class="version-tag app-version">גרסה 1.1</div>
   </div>
 
   <!-- MAIN -->
@@ -302,6 +307,11 @@
     <div class="hall-summary" id="hallSummary"></div>
 
     <!-- משובצים שסימנו שלא יגיעו -->
+    <div class="warn-box" id="splitConflictBox" style="display:none;">
+      <div class="declined-title">⚠️ מספר האנשים השתנה אחרי שפוצלו — לחץ כדי לאחד מחדש</div>
+      <div class="unassigned-list" id="splitConflictList"></div>
+    </div>
+
     <div class="warn-box" id="seatedDeclinedBox" style="display:none;">
       <div class="declined-title">⚠️ משובצים בשולחן אבל סימנו שלא יגיעו</div>
       <div class="unassigned-list" id="seatedDeclinedList" style="margin-bottom:10px;"></div>
@@ -330,6 +340,7 @@
     <button class="btn btn-outline" onclick="openBackups()" style="margin-bottom:10px;">💾 גיבויים ושחזור</button>
     <button class="btn btn-outline" onclick="exportExcel()" style="margin-bottom:10px;">📥 ייצוא לאקסל</button>
     <div class="logout-btn" onclick="doLogout()">⬅ יציאה</div>
+    <div class="version-tag app-version">גרסה 1.1</div>
   </div>
 
 </div>
@@ -439,7 +450,11 @@
 
   let currentUser  = null;
   let canEdit      = false;
-  let allGuests    = []; // { id, name, phone, category, side, sideKey, rsvp, people }
+  const APP_VERSION = '1.1';
+  let baseGuests   = []; // המוזמנים כפי שהם בפיירבס: { id, name, phone, category, side, sideKey, rsvp, people }
+  let allGuests    = []; // רשומות לשיבוץ (כולל חלקים מפוצלים) — נבנה ב-rebuildEntries
+  let entryMap     = new Map();
+  let splits       = {}; // { [guestId]: [{ pid, name, people }] } — נשמר מקומית
   let tables       = []; // [{ id, guests:[], label }]
   let numTables    = 10;
   let seatsPerTable = 10;
@@ -611,8 +626,8 @@
           }
         }
       }
-      allGuests = list;
-      applyRsvp();
+      baseGuests = list;
+      rebuildEntries();
       renderAll();
     });
 
@@ -626,7 +641,7 @@
         if (gid) rsvpById[gid] = rec;
         if (e.phone) rsvpByPhone[localPhone(e.phone)] = rec;
       }
-      applyRsvp();
+      rebuildEntries();
       renderAll();
     });
   }
@@ -638,7 +653,7 @@
   }
 
   function applyRsvp() {
-    for (const g of allGuests) {
+    for (const g of baseGuests) {
       const r = rsvpById[g.id] || (g.phone ? rsvpByPhone[localPhone(g.phone)] : null);
       if (!r) { g.rsvp = 'pending'; g.people = 1; continue; }
       g.rsvp   = r.attending ? 'confirmed' : 'declined';
@@ -646,8 +661,126 @@
     }
   }
 
+  // ===== פיצול מוזמנים =====
+  // רשומה מפוצלת: המזהה המקורי נשאר (כך הסידור הקיים לא נפגע),
+  // וכל חלק שהופרד מקבל מזהה "<מזהה מקורי>#<pid>".
+  // allGuests = רשימת "רשומות לשיבוץ": מוזמן רגיל, או מוזמן ראשי + החלקים שהופרדו ממנו.
+  function rebuildEntries() {
+    applyRsvp();
+    const out = [];
+    for (const b of baseGuests) {
+      const parts    = Array.isArray(splits[b.id]) ? splits[b.id] : [];
+      const partsSum = parts.reduce((s, p) => s + (p.people || 1), 0);
+      const conflict = parts.length > 0 && (b.rsvp !== 'confirmed' || partsSum >= b.people);
+      const mainPeople = (parts.length && b.rsvp === 'confirmed') ? Math.max(1, b.people - partsSum) : b.people;
+
+      out.push({ ...b, people: mainPeople, baseId: b.id, hasParts: parts.length > 0, splitConflict: conflict });
+
+      for (const p of parts) {
+        out.push({
+          id: b.id + '#' + p.pid,
+          name: p.name,
+          phone: '',
+          category: b.category,
+          side: b.side,
+          sideKey: b.sideKey,
+          rsvp: b.rsvp,
+          people: b.rsvp === 'confirmed' ? (p.people || 1) : (b.rsvp === 'declined' ? 0 : 1),
+          baseId: b.id,
+          pid: p.pid,
+          isPart: true,
+          splitConflict: conflict
+        });
+      }
+    }
+    allGuests = out;
+    entryMap  = new Map(out.map(g => [g.id, g]));
+  }
+
+  function splitGuest(tableId, guestId) {
+    if (!requireEdit()) return;
+    const g = guestById(guestId);
+    if (!g || g.isPart) return;
+    if (g.rsvp !== 'confirmed' || g.people < 2) {
+      showToast('אפשר לפצל רק מוזמן שאישר הגעה של יותר מאדם אחד', true);
+      return;
+    }
+
+    let count = 1;
+    if (g.people > 2) {
+      const v = prompt(`${g.name} — ${g.people} אנשים.\nכמה אנשים להפריד לרשומה נפרדת? (1 עד ${g.people - 1})`, '1');
+      if (v === null) return;
+      count = parseInt(v, 10);
+      if (!(count >= 1 && count <= g.people - 1)) { showToast('מספר לא תקין', true); return; }
+    }
+
+    const def = count === 1 ? `מלווה של ${g.name}` : `מלווים של ${g.name}`;
+    let name = prompt(
+      `שם לרשומה החדשה (${count === 1 ? 'אדם אחד' : count + ' אנשים'}).\nאפשר להשאיר כך, או למחוק ולהקליד את השם האמיתי:`, def);
+    if (name === null) return;
+    name = name.trim().slice(0, 60) || def;
+
+    const pid = 'p' + Date.now().toString(36);
+    splits[g.id] = [...(Array.isArray(splits[g.id]) ? splits[g.id] : []), { pid, name, people: count }];
+
+    // החלק החדש מופיע באותו שולחן, מיד אחרי המוזמן המקורי
+    const partId = g.id + '#' + pid;
+    const t = tables.find(t => t.id === tableId);
+    if (t) {
+      const i = t.guests.indexOf(g.id);
+      t.guests.splice(i >= 0 ? i + 1 : t.guests.length, 0, partId);
+    }
+
+    rebuildEntries();
+    markManual(); saveArrangement(); renderAll();
+    showToast(`✂️ "${name}" הופרד — העבר אותו לשולחן אחר עם ⇄`, false, 5000);
+  }
+  window.splitGuest = splitGuest;
+
+  function removePartData(baseId, pid) {
+    const partId = baseId + '#' + pid;
+    const left = (Array.isArray(splits[baseId]) ? splits[baseId] : []).filter(p => p.pid !== pid);
+    if (left.length) splits[baseId] = left; else delete splits[baseId];
+    tables.forEach(t => { t.guests = t.guests.filter(id => id !== partId); });
+  }
+
+  function afterMergeToast(baseId, msg) {
+    const t = tables.find(t => t.guests.includes(baseId));
+    if (t && occupancy(t) > seatsPerTable) {
+      showToast(`${msg} · ⚠️ שולחן ${t.id} עכשיו ${occupancy(t)}/${seatsPerTable}`, true, 5000);
+    } else {
+      showToast(msg);
+    }
+  }
+
+  function mergePart(partId) {
+    if (!requireEdit()) return;
+    const p = guestById(partId);
+    if (!p || !p.isPart) return;
+    const base = guestById(p.baseId);
+    if (!confirm(`לאחד את "${p.name}" חזרה עם ${base ? base.name : 'המוזמן המקורי'}?`)) return;
+    removePartData(p.baseId, p.pid);
+    rebuildEntries();
+    markManual(); saveArrangement(); renderAll();
+    afterMergeToast(p.baseId, `🔗 אוחד חזרה עם ${base ? base.name : 'המוזמן'}`);
+  }
+  window.mergePart = mergePart;
+
+  function mergeAllParts(baseId) {
+    if (!requireEdit()) return;
+    const base = guestById(baseId);
+    const parts = Array.isArray(splits[baseId]) ? [...splits[baseId]] : [];
+    if (!parts.length) return;
+    if (!confirm(`לאחד מחדש את כל הפיצולים של ${base ? base.name : 'המוזמן'}?`)) return;
+    parts.forEach(p => removePartData(baseId, p.pid));
+    rebuildEntries();
+    markManual(); saveArrangement(); renderAll();
+    afterMergeToast(baseId, `🔗 ${base ? base.name : 'המוזמן'} אוחד מחדש`);
+  }
+  window.mergeAllParts = mergeAllParts;
+
   // ===== עזרי חישוב =====
-  function guestById(id) { return allGuests.find(g => g.id === id); }
+  function guestById(id) { return entryMap.get(id); }
   function seatedOf(t) { return t.guests.map(guestById).filter(Boolean); }
   function seatCount(g) { return g.rsvp === 'declined' ? 0 : Math.max(1, g.people); }
 
@@ -701,7 +834,8 @@
   function snapshotData() {
     return {
       numTables, seatsPerTable, manual: manualEdits,
-      tables: tables.map(t => ({ id: t.id, guests: [...t.guests], label: t.label || '' }))
+      tables: tables.map(t => ({ id: t.id, guests: [...t.guests], label: t.label || '' })),
+      splits: JSON.parse(JSON.stringify(splits))
     };
   }
 
@@ -715,12 +849,16 @@
       label: t.label || ''
     }));
     while (tables.length < numTables) tables.push({ id: tables.length + 1, guests: [], label: '' });
+    // גרסה 1.0 לא שמרה פיצולים — אם אין, משאירים את הקיימים
+    if (d.splits && typeof d.splits === 'object') splits = JSON.parse(JSON.stringify(d.splits));
+    rebuildEntries();
     document.getElementById('valTables').textContent = numTables;
     document.getElementById('valSeats').textContent  = seatsPerTable;
   }
 
-  // טעינה בכניסה
+  // טעינה בכניסה (תואם לשמירה של גרסה 1.0 — אותו מפתח ואותו מבנה)
   function loadLocal() {
+    splits = {};
     const saved = lsRead('state', null);
     if (saved) {
       applyData(saved);
@@ -920,6 +1058,21 @@
     const declined = allGuests.filter(g => inFilter(g) && !seated.has(g.id) && g.rsvp === 'declined');
     const seatedDeclined = allGuests.filter(g => inFilter(g) && seated.has(g.id) && g.rsvp === 'declined');
 
+    // פיצולים שכבר לא מתאימים (מספר האנשים השתנה אחרי הפיצול)
+    const conflicts = allGuests.filter(g => inFilter(g) && !g.isPart && g.splitConflict);
+    const cBox = document.getElementById('splitConflictBox');
+    if (conflicts.length) {
+      cBox.style.display = 'block';
+      document.getElementById('splitConflictList').innerHTML = conflicts.map(g => {
+        const now = g.rsvp === 'confirmed' ? `אישר ${baseGuests.find(b => b.id === g.id)?.people || 1}`
+                  : g.rsvp === 'declined' ? 'לא מגיע' : 'לא ענה';
+        return `<span class="guest-chip chip-no" ${canEdit ? `style="cursor:pointer !important" onclick="mergeAllParts('${g.id}')"` : ''}>
+                  ${escHtml(g.name)} · ${now}${canEdit ? ' · 🔗 אחד' : ''}</span>`;
+      }).join('');
+    } else {
+      cBox.style.display = 'none';
+    }
+
     // משובצים שסירבו
     const sdBox = document.getElementById('seatedDeclinedBox');
     if (seatedDeclined.length) {
@@ -982,10 +1135,14 @@
               : list.map(g => {
                   const dec = g.rsvp === 'declined';
                   return `
-                <div class="table-guest-row ${dec ? 'declined-row' : ''}">
-                  <div class="table-guest-name">${escHtml(g.name)}${!dec && g.people > 1 ? ` <span style="opacity:.6">(${g.people})</span>` : ''}${dec ? ' <span class="rsvp-tag rsvp-no">✕ לא מגיע</span>' : ''}${g.rsvp === 'pending' ? ' <span class="rsvp-tag rsvp-wait">?</span>' : ''}</div>
+                <div class="table-guest-row ${dec ? 'declined-row' : ''} ${g.isPart ? 'part-row' : ''}">
+                  <div class="table-guest-name">${g.isPart ? '<span class="part-mark">↳</span> ' : ''}${escHtml(g.name)}${!dec && g.people > 1 ? ` <span style="opacity:.6">(${g.people})</span>` : ''}${dec ? ' <span class="rsvp-tag rsvp-no">✕ לא מגיע</span>' : ''}${g.rsvp === 'pending' ? ' <span class="rsvp-tag rsvp-wait">?</span>' : ''}${g.splitConflict ? ' <span class="rsvp-tag rsvp-no">⚠️</span>' : ''}</div>
                   <div class="table-guest-side">${escHtml(g.side)}</div>
-                  ${canEdit ? `<button class="table-move-btn" onclick="openMove(${t.id}, '${g.id}')">⇄</button>
+                  ${canEdit ? `${g.isPart
+                                  ? `<button class="table-split-btn" title="אחד חזרה" onclick="mergePart('${g.id}')">🔗</button>`
+                                  : (g.rsvp === 'confirmed' && g.people > 1
+                                      ? `<button class="table-split-btn" title="פצל" onclick="splitGuest(${t.id}, '${g.id}')">✂️</button>` : '')}
+                               <button class="table-move-btn" onclick="openMove(${t.id}, '${g.id}')">⇄</button>
                                <button class="table-guest-remove" onclick="removeFromTable(${t.id}, '${g.id}')">✕</button>` : ''}
                 </div>`;
                 }).join('')
@@ -1513,6 +1670,8 @@
     toastTimer = setTimeout(() => t.classList.remove('show'), ms || (msg.length > 40 ? 5000 : 2500));
   }
   window.showToast = showToast;
+
+  document.querySelectorAll('.app-version').forEach(el => { el.textContent = 'גרסה ' + APP_VERSION; });
 </script>
 </body>
 </html>
